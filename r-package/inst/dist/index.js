@@ -588,32 +588,33 @@
 
   // New AudioClipperElement
   class AudioClipperElement extends HTMLElement {
-    constructor() {
-      super();
-      this.chunks = [];
-      this.attachShadow({ mode: "open" });
-      this.shadowRoot.innerHTML = `
-        <style>
-          :host {
-            display: block;
-            width: 100%;
-            height: min-content;
-          }
-          .panel-settings {
-            margin: 0.5em;
-          }
-          .panel-buttons {
-            margin: 0.5em;
-          }
-        </style>
-        <div class="panel-settings">
-          <slot name="settings"></slot>
-        </div>
-        <div class="panel-buttons">
-          <slot name="recording-controls"></slot>
-        </div>
-      `;
-    }
+  constructor() {
+    super();
+    this.chunks = [];
+    this.attachShadow({ mode: "open" });
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: block;
+          width: 100%;
+          height: min-content;
+        }
+        .panel-settings {
+          margin: 0.5em;
+        }
+        .panel-buttons {
+          margin: 0.5em;
+          display: block !important;  /* Force display */
+        }
+      </style>
+      <div class="panel-settings">
+        <slot name="settings"></slot>
+      </div>
+      <div class="panel-buttons">
+        <slot name="recording-controls"></slot>
+      </div>
+    `;
+  }
 
     connectedCallback() {
       (async () => {
