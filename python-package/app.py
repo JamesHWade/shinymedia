@@ -4,6 +4,7 @@ from shinymedia import input_audio_clip, audio_spinner
 from query import chat
 from faicons import icon_svg
 from htmltools import css
+import shinyswatch
 
 # This will hold the chat history for the current session, allowing us to chat
 # with GPT-4o across multiple audio clips.
@@ -17,6 +18,9 @@ input_audio_clip(
     style=css(width="600px", max_width="100%"),
     audio_bits_per_second=64000,
 )
+
+
+ui.page_opts(theme=shinyswatch.theme.lux)
 
 # A long-running task that actually does the chat with GPT-4o. It takes the
 # audio clip and a list of existing messages as input, and returns the chat
@@ -34,7 +38,6 @@ async def chat_task(audio_clip, messages, session):
 def start_chat():
     chat_task.cancel()
     req(input.clip())
-    print(input.clip())
     chat_task(input.clip(), messages[:], session)
 
 # Show the chat response
