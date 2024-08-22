@@ -149,6 +149,7 @@ def input_audio_clip(
     reset_on_record: bool = True,
     mime_type: str | None = None,
     audio_bits_per_second: int | None = None,
+    show_mic_settings: bool = True,
     **kwargs: TagAttrValue,
 ):
     """
@@ -172,6 +173,9 @@ def input_audio_clip(
         which means the browser will choose a suitable bitrate for audio
         recording. This is only a suggestion; the browser may choose a different
         bitrate.
+    show_mic_settings
+        Whether to show the microphone settings in the settings menu. By
+        default, this is `True`.
     **kwargs
         Additional attributes for the audio clip input, to be added directly to
         the `<audio-clipper>` element.
@@ -192,30 +196,46 @@ def input_audio_clip(
     # Set or extend the class_ attribute
     extend_attr(kwargs, "class_", "shiny-audio-clip")
 
+    settings_menu = ui.Tag(
+        "av-settings-menu",
+        ui.div(
+            ui.tags.button(
+                icon_svg("gear").add_class("fw"),
+                class_="btn btn-sm btn-secondary dropdown-toggle px-3 py-2",
+                type="button",
+                data_bs_toggle="dropdown",
+            ),
+            ui.tags.ul(
+                ui.tags.li(
+                    ui.tags.h6("Microphone", class_="dropdown-header"),
+                    class_="mic-header",
+                ),
+                # Microphone items will go here
+                class_="dropdown-menu",
+            ),
+            class_="btn-group",
+        ),
+        slot="settings",
+    ) if show_mic_settings else ui.Tag(
+        "av-settings-menu",
+        ui.div(
+            ui.tags.ul(
+                ui.tags.li(
+                    ui.tags.h6("Microphone", class_="dropdown-header"),
+                    class_="mic-header",
+                ),
+                # Microphone items will go here
+                class_="dropdown-menu",
+            ),
+            class_="btn-group",
+        ),
+        slot="settings",
+    )
+
     return ui.Tag(
         "audio-clipper",
         multimodal_dep,
-        ui.Tag(
-            "av-settings-menu",
-            ui.div(
-                ui.tags.button(
-                    icon_svg("gear").add_class("fw"),
-                    class_="btn btn-sm btn-secondary dropdown-toggle px-3 py-2",
-                    type="button",
-                    data_bs_toggle="dropdown",
-                ),
-                ui.tags.ul(
-                    ui.tags.li(
-                        ui.tags.h6("Microphone", class_="dropdown-header"),
-                        class_="mic-header",
-                    ),
-                    # Microphone items will go here
-                    class_="dropdown-menu",
-                ),
-                class_="btn-group",
-            ),
-            slot="settings",
-        ),
+        settings_menu,
         ui.div(
             ui.tags.button(
                 ui.TagList(
