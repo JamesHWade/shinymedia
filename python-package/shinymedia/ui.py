@@ -9,6 +9,7 @@ from shiny import module, ui
 
 __all__ = (
     "input_video_clip",
+    "input_audio_clip",
     "audio_spinner",
 )
 
@@ -142,6 +143,110 @@ def input_video_clip(
         **kwargs,
     )
 
+def input_audio_clip(
+    id: str,
+    *,
+    reset_on_record: bool = True,
+    mime_type: str | None = None,
+    audio_bits_per_second: int | None = None,
+    **kwargs: TagAttrValue,
+):
+    """
+    An audio clip input control that records short audio clips from the microphone.
+
+    Parameters
+    ----------
+    id
+        The input ID to use for this control.
+    reset_on_record
+        Whether to reset the audio clip input value when recording starts. If
+        `True`, the audio clip input value will become `None` at the moment the
+        Record button is pressed; if `False`, the value will not change until
+        the user stops recording. By default, this is `True`.
+    mime_type
+        The MIME type of the audio clip to record. By default, this is `None`,
+        which means the browser will choose a suitable MIME type for audio
+        recording. Common MIME types include `audio/webm` and `audio/mp4`.
+    audio_bits_per_second
+        The target audio bitrate in bits per second. By default, this is `None`,
+        which means the browser will choose a suitable bitrate for audio
+        recording. This is only a suggestion; the browser may choose a different
+        bitrate.
+    **kwargs
+        Additional attributes for the audio clip input, to be added directly to
+        the `<audio-clipper>` element.
+
+    Returns
+    -------
+    ui.Tag
+        The audio clip input tag, to be inserted into a Shiny app. From the
+        server's `input` object, you can access the audio clip input value using
+        the ID you provided here; for example, `input_audio_clip("foo")` would
+        be available as `input.foo()`. The value is either `None` (if no audio
+        has been recorded) or a base64-encoded data URL representing the audio
+        clip.
+    """
+
+    id = module.resolve_id(id)
+
+    # Set or extend the class_ attribute
+    extend_attr(kwargs, "class_", "shiny-audio-clip")
+
+    return ui.Tag(
+        "audio-clipper",
+        multimodal_dep,
+        ui.Tag(
+            "av-settings-menu",
+            ui.div(
+                ui.tags.button(
+                    icon_svg("gear").add_class("fw"),
+                    class_="btn btn-sm btn-secondary dropdown-toggle px-3 py-2",
+                    type="button",
+                    data_bs_toggle="dropdown",
+                ),
+                ui.tags.ul(
+                    ui.tags.li(
+                        ui.tags.h6("Microphone", class_="dropdown-header"),
+                        class_="mic-header",
+                    ),
+                    # Microphone items will go here
+                    class_="dropdown-menu",
+                ),
+                class_="btn-group",
+            ),
+            slot="settings",
+        ),
+        ui.div(
+            ui.tags.button(
+                ui.TagList(
+                    ui.tags.div(
+                        style="display: inline-block; background-color: red; width: 1rem; height: 1rem; border-radius: 100%; position: relative; top: 0.175rem; margin-right: 0.3rem;"
+                    ),
+                    "Record",
+                ),
+                style="display: block;",
+                class_="record-button btn btn-secondary px-3 mx-auto",
+            ),
+            ui.tags.button(
+                ui.TagList(
+                    ui.tags.div(
+                        style="display: inline-block; background-color: currentColor; width: 1rem; height: 1rem; position: relative; top: 0.175rem; margin-right: 0.3rem;"
+                    ),
+                    "Stop",
+                ),
+                style="display: block;",
+                class_="stop-button btn btn-secondary px-3 mx-auto",
+            ),
+            slot="recording-controls",
+            class_="btn-group",
+            aria_label="Recording controls",
+        ),
+        id=id,
+        data_reset_on_record=reset_on_record,
+        data_mime_type=mime_type,
+        data_audio_bits_per_second=audio_bits_per_second,
+        **kwargs,
+    )
 
 def audio_spinner(
     *,

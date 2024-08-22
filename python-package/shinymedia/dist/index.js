@@ -275,6 +275,9 @@
     setMics(mics) {
       this.#setDevices("mic", mics);
     }
+    setMicsOnly(mics) {
+      this.#setDevices("mic", mics);
+    }
     get cameraId() {
       return this.#getSelectedDevice("camera");
     }
@@ -583,6 +586,156 @@
     return isNaN(parsed) ? void 0 : parsed;
   }
 
+  // New AudioClipperElement
+  class AudioClipperElement extends HTMLElement {
+    constructor() {
+      super();
+      this.chunks = [];
+      this.attachShadow({ mode: "open" });
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host {
+            display: block;
+            width: 100%;
+            height: min-content;
+          }
+          .panel-settings {
+            margin: 0.5em;
+          }
+          .panel-buttons {
+            margin: 0.5em;
+          }
+        </style>
+        <div class="panel-settings">
+          <slot name="settings"></slot>
+        </div>
+        <div class="panel-buttons">
+          <slot name="recording-controls"></slot>
+        </div>
+      `;
+    }
+
+    connectedCallback() {
+      (async () => {
+        const slotSettings = this.shadowRoot.querySelector(
+          "slot[name=settings]"
+        );
+        slotSettings.addEventListener("slotchange", async () => {
+          this.avSettingsMenu = slotSettings.assignedElements()[0];
+          await this.#initializeMediaInput();
+          if (this.buttonRecord) {
+            this.#setEnabledButton(this.buttonRecord);
+          }
+        });
+        const slotControls = this.shadowRoot.querySelector(
+          "slot[name=recording-controls]"
+        );
+        slotControls.addEventListener("slotchange", () => {
+          const findButton = (selector) => {
+            for (const el of slotControls.assignedElements()) {
+              if (el.matches(selector)) {
+                return el;
+              }
+              const sub = el.querySelector(selector);
+              if (sub) {
+                return sub;
+              }
+            }
+            return null;
+          };
+          this.buttonRecord = findButton(".record-button");
+          this.buttonStop = findButton(".stop-button");
+          this.#setEnabledButton();
+          this.buttonRecord.addEventListener("click", () => {
+            this.dispatchEvent(new CustomEvent("recordstart"));
+            this.#setEnabledButton(this.buttonStop);
+            this._beginRecord();
+          });
+          this.buttonStop.addEventListener("click", () => {
+            this._endRecord();
+            this.#setEnabledButton(this.buttonRecord);
+          });
+        });
+      })().catch((err) => {
+        console.error(err);
+      });
+    }
+
+    #setEnabledButton(btn) {
+      this.buttonRecord.style.display = btn === this.buttonRecord ? "inline-block" : "none";
+      this.buttonStop.style.display = btn === this.buttonStop ? "inline-block" : "none";
+    }
+
+    async setMediaDevices(micId) {
+      if (this.audioStream) {
+        this.audioStream.getTracks().forEach((track) => track.stop());
+      }
+      this.audioStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: micId || undefined,
+        },
+      });
+      return {
+        micId: this.audioStream.getAudioTracks()[0].getSettings().deviceId,
+      };
+    }
+
+    async #initializeMediaInput() {
+      const savedMic = window.localStorage.getItem("multimodal-mic");
+      const { micId } = await this.setMediaDevices(savedMic);
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      this.avSettingsMenu.setMicsOnly(
+        devices.filter((dev) => dev.kind === "audioinput")
+      );
+      this.avSettingsMenu.micId = micId;
+      const handleDeviceChange = async (deviceType, deviceId) => {
+        if (!deviceId) return;
+        window.localStorage.setItem(`multimodal-${deviceType}`, deviceId);
+        await this.setMediaDevices(this.avSettingsMenu.micId);
+      };
+      this.avSettingsMenu.addEventListener("mic-change", (e) => {
+        handleDeviceChange("mic", this.avSettingsMenu.micId);
+      });
+    }
+
+    _beginRecord() {
+      this.recorder = new MediaRecorder(this.audioStream, {
+        mimeType: this.dataset.mimeType,
+        audioBitsPerSecond: safeFloat(this.dataset.audioBitsPerSecond)
+      });
+      this.recorder.addEventListener("error", (e) => {
+        console.error("MediaRecorder error:", e.error);
+      });
+      this.recorder.addEventListener("dataavailable", (e) => {
+        this.chunks.push(e.data);
+      });
+      this.recorder.addEventListener("start", () => {
+      });
+      this.recorder.addEventListener("stop", () => {
+        if (this.chunks.length === 0) {
+          console.warn("No data recorded");
+          return;
+        }
+        const blob = new Blob(this.chunks, { type: this.chunks[0].type });
+        const event = new BlobEvent("data", {
+          data: blob
+        });
+        try {
+          this.dispatchEvent(event);
+        } finally {
+          this.chunks = [];
+        }
+      });
+      this.recorder.start();
+    }
+
+    _endRecord() {
+      this.recorder.stop();
+    }
+  }
+
+  customElements.define("audio-clipper", AudioClipperElement);
+
   // srcts/index.ts
   if (window.Shiny) {
     let bustAutoPlaySuppression = function() {
@@ -655,6 +808,54 @@
       new VideoClipperBinding(),
       "video-clipper"
     );
+
+    // New AudioClipperBinding
+    class AudioClipperBinding extends Shiny.InputBinding {
+      #lastKnownValue = new WeakMap();
+      #handlers = new WeakMap();
+
+      find(scope) {
+        return $(scope).find("audio-clipper.shiny-audio-clip");
+      }
+
+      getValue(el) {
+        return this.#lastKnownValue.get(el);
+      }
+
+      subscribe(el, callback) {
+        const handler = async (ev) => {
+          const blob = ev.data;
+          console.log(`Recorded audio of type ${blob.type} and size ${blob.size} bytes`);
+          const encoded = `data:${blob.type};base64,${await base64(blob)}`;
+          this.#lastKnownValue.set(el, encoded);
+          callback(true);
+        };
+        el.addEventListener("data", handler);
+
+        const handler2 = (ev) => {
+          if (typeof el.dataset.resetOnRecord !== "undefined") {
+            this.#lastKnownValue.set(el, null);
+            callback(true);
+          }
+        };
+        el.addEventListener("recordstart", handler2);
+
+        this.#handlers.set(el, [handler, handler2]);
+      }
+
+      unsubscribe(el) {
+        const handlers = this.#handlers.get(el);
+        el.removeEventListener("data", handlers[0]);
+        el.removeEventListener("recordstart", handlers[1]);
+        this.#handlers.delete(el);
+      }
+    }
+
+    window.Shiny.inputBindings.register(
+      new AudioClipperBinding(),
+      "audio-clipper"
+    );
+
     async function base64(blob) {
       const buf = await blob.arrayBuffer();
       const results = [];
@@ -665,6 +866,7 @@
       }
       return btoa(results.join(""));
     }
+
     document.addEventListener("DOMContentLoaded", bustAutoPlaySuppression);
   }
   var bustAutoPlaySuppression2;
