@@ -12,6 +12,7 @@
 #'   which means the browser will choose a suitable bitrate for audio
 #'   recording. This is only a suggestion; the browser may choose a different
 #'   bitrate.
+#' @param show_mic_settings Whether to show the microphone settings in the settings menu. Default is TRUE.
 #' @param ... Additional parameters to pass to the underlying HTML tag.
 #'
 #' @return An audio clip input control that can be added to a UI definition.
@@ -24,31 +25,49 @@ input_audio_clip <- function(
   reset_on_record = TRUE,
   mime_type = NULL,
   audio_bits_per_second = NULL,
+  show_mic_settings = TRUE,
   ...
 ) {
-  
+
   # Create the settings menu
-  settings_menu <- tag("av-settings-menu", list(
-    slot = "settings",
-    div(
-      class = "btn-group",
-      tags$button(
-        class = "btn btn-sm btn-secondary dropdown-toggle px-3 py-2",
-        type = "button",
-        `data-bs-toggle` = "dropdown",
-        icon("gear")
-      ),
-      tags$ul(
-        class = "dropdown-menu",
-        tags$li(
-          class = "mic-header",
-          tags$h6("Microphone", class = "dropdown-header")
+  settings_menu <- if (show_mic_settings) {
+    tag("av-settings-menu", list(
+      slot = "settings",
+      div(
+        class = "btn-group",
+        tags$button(
+          class = "btn btn-sm btn-secondary dropdown-toggle px-3 py-2",
+          type = "button",
+          `data-bs-toggle` = "dropdown",
+          icon("gear", class = "fw")
+        ),
+        tags$ul(
+          class = "dropdown-menu",
+          tags$li(
+            class = "mic-header",
+            tags$h6("Microphone", class = "dropdown-header")
+          )
+          # Microphone items will go here
         )
-        # Microphone items will go here
       )
-    )
-  ))
-  
+    ))
+  } else {
+    tag("av-settings-menu", list(
+      slot = "settings",
+      div(
+        class = "btn-group",
+        tags$ul(
+          class = "dropdown-menu",
+          tags$li(
+            class = "mic-header",
+            tags$h6("Microphone", class = "dropdown-header")
+          )
+          # Microphone items will go here
+        )
+      )
+    ))
+  }
+
   # Create the recording controls
   recording_controls <- div(
     class = "btn-group",
@@ -57,21 +76,25 @@ input_audio_clip <- function(
     tags$button(
       class = "record-button btn btn-secondary px-3 mx-auto",
       style = "display: block;",
-      div(
-        style = "display: inline-block; background-color: red; width: 1rem; height: 1rem; border-radius: 100%; position: relative; top: 0.175rem; margin-right: 0.3rem;"
-      ),
-      "Record"
+      tagList(
+        div(
+          style = "display: inline-block; background-color: red; width: 1rem; height: 1rem; border-radius: 100%; position: relative; top: 0.175rem; margin-right: 0.3rem;"
+        ),
+        "Record"
+      )
     ),
     tags$button(
       class = "stop-button btn btn-secondary px-3 mx-auto",
       style = "display: block;",
-      div(
-        style = "display: inline-block; background-color: currentColor; width: 1rem; height: 1rem; position: relative; top: 0.175rem; margin-right: 0.3rem;"
-      ),
-      "Stop"
+      tagList(
+        div(
+          style = "display: inline-block; background-color: currentColor; width: 1rem; height: 1rem; position: relative; top: 0.175rem; margin-right: 0.3rem;"
+        ),
+        "Stop"
+      )
     )
   )
-  
+
   # Create the main audio-clipper tag
   tag("audio-clipper", list(
     id = inputId,
